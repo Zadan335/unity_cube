@@ -1,4 +1,4 @@
-name: Unity Android CI
+name: Unity Android Build (ARM Mac)
 
 on:
   push:
@@ -9,66 +9,64 @@ jobs:
   build-android:
     runs-on: [self-hosted, macOS]
 
+    env:
+      UNITY_PATH: /Applications/Unity/Hub/Editor/6000.3.15f1/Unity.app/Contents/MacOS/Unity
+      PROJECT_PATH: ${{ github.workspace }}
+      TMPDIR: /tmp/unity
+
     steps:
-      # 1. Checkout repo
-      - name: Checkout
+      # 1. Checkout project
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Debug workspace
+      # 2. Debug workspace (optional but useful)
       - name: Debug Workspace
         run: |
           pwd
           ls -la
-          ls Assets Packages ProjectSettings || echo "Not a Unity project"
+          echo "Unity Path: $UNITY_PATH"
 
-      # 3. Locate Unity safely
-      - name: Locate Unity
-        id: unity
+      # 3. Fix permissions (important for cloned projects)
+      - name: Fix Permissions
         run: |
-          UNITY_PATH=$(find /Applications/Unity/Hub/Editor -type f -name Unity | grep "/MacOS/Unity" | head -n 1)
+          sudo chown -R $(whoami) .
+          chmod -R u+rw .
 
-          if [ -z "$UNITY_PATH" ]; then
-            echo "❌ Unity not found"
-            exit 1
-          fi
-
-          echo "UNITY_PATH=$UNITY_PATH" >> $GITHUB_ENV
-          echo "✅ Found Unity at: $UNITY_PATH"
-
-      # 4. Make sure Unity is executable
-      - name: Fix permissions
+      # 4. Clean Unity generated folders (prevents Burst/Library corruption)
+      - name: Clean Unity Cache
         run: |
-          chmod +x "$UNITY_PATH"
+          rm -rf Library
+          rm -rf Temp
+          rm -rf Obj
 
-      # 5. Build Android (Rosetta Intel mode if required)
-      - name: Build Android
+      # 5. Ensure safe temp directory (fixes Burst permission issues)
+      - name: Setup TMPDIR
         run: |
-          arch -x86_64 "$UNITY_PATH" \
+          mkdir -p /tmp/unity
+          export TMPDIR=/tmp/unity
+
+      # 6. Run Unity Build (NO arch -x86_64)
+      - name: Build Android APK
+        run: |
+          "$UNITY_PATH" \
             -batchmode \
             -nographics \
-            -projectPath "$GITHUB_WORKSPACE" \
+            -projectPath "$PROJECT_PATH" \
             -executeMethod BuildScript.BuildAndroid \
             -quit \
             -logFile unity_build.log
 
-      # 6. Upload Unity logs
-      - name: Upload Logs
+      # 7. Upload logs (very important for debugging)
+      - name: Upload Unity Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unity-logs
           path: unity_build.log
 
-      # 7. Find APK safely
-      - name: Locate APK
-        run: |
-          find . -name "*.apk" > apk_list.txt
-          cat apk_list.txt
-
-      # 8. Upload APK
+      # 8. Upload APK (adjust path if needed)
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: android-build
-          path: |
-            **/*.apk
+          path: Builds/*.apk
