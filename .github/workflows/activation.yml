@@ -31,7 +31,7 @@ jobs:
         env:
           UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}   # not required if Mac already activated, but safe
         with:
-          unityVersion: 2022.3.62f1
+          unityVersion: 2022.3.62f3
           targetPlatform: Android
           buildMethod: BuildScript.BuildAndroid
           androidExportType: androidPackage
