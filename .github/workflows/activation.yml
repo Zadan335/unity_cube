@@ -44,7 +44,7 @@ jobs:
           UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: ${{ github.workspace }}
-          unityVersion: 2022.3.62f1
+          unityVersion: 2022.3.62f3
           targetPlatform: Android
           buildMethod: BuildScript.BuildAndroid
 
