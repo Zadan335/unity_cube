@@ -19,10 +19,9 @@ jobs:
       image: unityci/editor:ubuntu-2022.3.59f1-android-3.1.0
 
     env:
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
       UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
       UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
-      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
       ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
       ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       ANDROID_KEY_ALIAS_PASS: ${{ secrets.ANDROID_KEY_ALIAS_PASS }}
@@ -33,17 +32,13 @@ jobs:
 
       - name: Check required secrets
         run: |
-          if [ -z "$UNITY_EMAIL" ] || [ -z "$UNITY_PASSWORD" ] || [ -z "$UNITY_SERIAL" ]; then
-            echo "Missing Unity credentials"
+          if [ -z "$UNITY_LICENSE" ]; then
+            echo "UNITY_LICENSE secret is missing"
             exit 1
           fi
 
       - name: Activate Unity personal license
         run: |
-          if [ -z "$UNITY_LICENSE" ]; then
-            echo "UNITY_LICENSE secret is missing"
-            exit 1
-          fi
           echo "$UNITY_LICENSE" > /tmp/Unity_lic.ulf
           mkdir -p /root/.local/share/unity3d/Unity
           mv /tmp/Unity_lic.ulf /root/.local/share/unity3d/Unity/Unity_lic.ulf
