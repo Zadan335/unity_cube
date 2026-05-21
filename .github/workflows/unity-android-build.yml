@@ -1,0 +1,53 @@
+name: Unity Android Build
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Cache Unity packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/unity3d
+            ~/.cache/unity
+          key: ${{ runner.os }}-unity-${{ hashFiles('ProjectSettings/ProjectVersion.txt', 'Packages/manifest.json') }}
+          restore-keys: |
+            ${{ runner.os }}-unity-
+
+      - name: Setup Unity Editor
+        id: setup-unity
+        uses: game-ci/unity-setup@v2
+        with:
+          unityVersion: 2022.3.62f3
+          githubToken: ${{ secrets.GITHUB_TOKEN }}
+          activateLicense: true
+          license: ${{ secrets.UNITY_LICENSE }}
+          components: Android
+
+      - name: Build Android APK
+        env:
+          UNITY_PATH: ${{ steps.setup-unity.outputs.unityPath }}
+        run: |
+          echo "Building Android APK..."
+          "$UNITY_PATH/Unity" -batchmode -nographics -projectPath . -executeMethod AndroidBuild.PerformAndroidBuild -quit
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: Builds/Android/Cube.apk
