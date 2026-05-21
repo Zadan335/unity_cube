@@ -1,4 +1,4 @@
-name: Unity Android CI (Builder)
+name: Unity Android CI
 
 on:
   push:
@@ -6,17 +6,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-android:
     runs-on: [self-hosted, macOS]
 
     steps:
-      # 1. Checkout code
+      # 1. Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2. Cache Library (important)
+      # 2. DEBUG STEP (VERY IMPORTANT)
+      - name: Debug Workspace
+        run: |
+          echo "WORKDIR:"
+          pwd
+          echo "FILES:"
+          ls -la
+          echo "UNITY PROJECT CHECK:"
+          ls Assets Packages ProjectSettings || echo "❌ NOT UNITY ROOT"
+
+      # 3. Cache Unity Library (BIG SPEED BOOST)
       - name: Cache Library
         uses: actions/cache@v4
         with:
@@ -25,20 +35,30 @@ jobs:
           restore-keys: |
             Library-${{ runner.os }}-
 
-      # 3. Unity Builder (MAIN STEP)
+      # 4. Build Android (Unity Builder)
       - name: Build Android APK
         uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}   # not required if Mac already activated, but safe
         with:
-          unityVersion: 2022.3.62f3
+          projectPath: ${{ github.workspace }}
+          unityVersion: 2022.3.62f1
           targetPlatform: Android
           buildMethod: BuildScript.BuildAndroid
           androidExportType: androidPackage
 
-      # 4. Upload build
+      # 5. Upload logs (always helpful)
+      - name: Upload Unity Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unity-logs
+          path: |
+            build.log
+            Unity.log
+            unity_build.log
+
+      # 6. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: android-build
-          path: build/android
+          path: build/android/**/*.apk
