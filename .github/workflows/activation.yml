@@ -1,4 +1,4 @@
-name: Unity Legacy Activation Test
+name: Unity Activation Test
 
 on:
   workflow_dispatch:
@@ -18,11 +18,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Verify Unity
-        run: |
-          which unity-editor
-          unity-editor -version
-
       - name: Activate Unity License
         run: |
           unity-editor -batchmode -nographics -quit \
@@ -31,5 +26,7 @@ jobs:
             -serial "$UNITY_SERIAL" \
             -logFile unity-license.log
 
-      - name: Show Log
-        run: cat unity-license.log
+      - name: Show Unity Log
+        if: always()
+        run: |
+          cat unity-license.log
