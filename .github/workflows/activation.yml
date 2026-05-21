@@ -1,32 +1,44 @@
-name: Unity Activation Test
+name: Unity Android CI (Builder)
 
 on:
+  push:
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
-  activation:
-    runs-on: ubuntu-latest
-
-    container:
-      image: unityci/editor:ubuntu-2022.3.59f1-android-3.1.0
-
-    env:
-      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+  build:
+    runs-on: [self-hosted, macOS]
 
     steps:
-      - uses: actions/checkout@v4
+      # 1. Checkout code
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - name: Activate Unity License
-        run: |
-          unity-editor -batchmode -nographics -quit \
-            -username "$UNITY_EMAIL" \
-            -password "$UNITY_PASSWORD" \
-            -serial "$UNITY_SERIAL" \
-            -logFile unity-license.log
+      # 2. Cache Library (important)
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: Library-${{ runner.os }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: |
+            Library-${{ runner.os }}-
 
-      - name: Show Unity Log
-        if: always()
-        run: |
-          cat unity-license.log
+      # 3. Unity Builder (MAIN STEP)
+      - name: Build Android APK
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}   # not required if Mac already activated, but safe
+        with:
+          unityVersion: 2022.3.62f1
+          targetPlatform: Android
+          buildMethod: BuildScript.BuildAndroid
+          androidExportType: androidPackage
+
+      # 4. Upload build
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-build
+          path: build/android
