@@ -10,27 +10,38 @@ jobs:
     runs-on: [self-hosted, macOS]
 
     steps:
-      # 1. Checkout
+      # 1. Checkout repo
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Debug
+      # 2. Debug workspace
       - name: Debug Workspace
         run: |
           pwd
           ls -la
-          ls Assets Packages ProjectSettings || echo "Not Unity project"
+          ls Assets Packages ProjectSettings || echo "Not a Unity project"
 
-      # 3. Find Unity (dynamic safe)
+      # 3. Locate Unity safely
       - name: Locate Unity
         id: unity
         run: |
-          UNITY_PATH=$(find /Applications/Unity/Hub/Editor -name Unity -type f | head -n 1)
-          echo "UNITY_PATH=$UNITY_PATH" >> $GITHUB_ENV
-          echo "Found Unity: $UNITY_PATH"
+          UNITY_PATH=$(find /Applications/Unity/Hub/Editor -type f -name Unity | grep "/MacOS/Unity" | head -n 1)
 
-      # 4. Build using Rosetta (FIX FOR YOUR CRASH)
-      - name: Build Android (Rosetta Intel Mode)
+          if [ -z "$UNITY_PATH" ]; then
+            echo "❌ Unity not found"
+            exit 1
+          fi
+
+          echo "UNITY_PATH=$UNITY_PATH" >> $GITHUB_ENV
+          echo "✅ Found Unity at: $UNITY_PATH"
+
+      # 4. Make sure Unity is executable
+      - name: Fix permissions
+        run: |
+          chmod +x "$UNITY_PATH"
+
+      # 5. Build Android (Rosetta Intel mode if required)
+      - name: Build Android
         run: |
           arch -x86_64 "$UNITY_PATH" \
             -batchmode \
@@ -40,7 +51,7 @@ jobs:
             -quit \
             -logFile unity_build.log
 
-      # 5. Upload logs
+      # 6. Upload Unity logs
       - name: Upload Logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -48,9 +59,16 @@ jobs:
           name: unity-logs
           path: unity_build.log
 
-      # 6. Upload APK
+      # 7. Find APK safely
+      - name: Locate APK
+        run: |
+          find . -name "*.apk" > apk_list.txt
+          cat apk_list.txt
+
+      # 8. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: android-build
-          path: build/android/**/*.apk
+          path: |
+            **/*.apk
