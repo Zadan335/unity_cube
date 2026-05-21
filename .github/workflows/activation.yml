@@ -13,20 +13,26 @@ jobs:
       # 1. Checkout
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      # 2. Debug (optional but useful)
+      # 2. Debug
       - name: Debug Workspace
         run: |
           pwd
           ls -la
           ls Assets Packages ProjectSettings || echo "Not Unity project"
 
-      # 3. Build using LOCAL Unity (NO LOGIN)
-      - name: Build Android with Local Unity
+      # 3. Find Unity (dynamic safe)
+      - name: Locate Unity
+        id: unity
         run: |
-          /Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/MacOS/Unity \
+          UNITY_PATH=$(find /Applications/Unity/Hub/Editor -name Unity -type f | head -n 1)
+          echo "UNITY_PATH=$UNITY_PATH" >> $GITHUB_ENV
+          echo "Found Unity: $UNITY_PATH"
+
+      # 4. Build using Rosetta (FIX FOR YOUR CRASH)
+      - name: Build Android (Rosetta Intel Mode)
+        run: |
+          arch -x86_64 "$UNITY_PATH" \
             -batchmode \
             -nographics \
             -projectPath "$GITHUB_WORKSPACE" \
@@ -34,7 +40,7 @@ jobs:
             -quit \
             -logFile unity_build.log
 
-      # 4. Upload logs
+      # 5. Upload logs
       - name: Upload Logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -42,7 +48,7 @@ jobs:
           name: unity-logs
           path: unity_build.log
 
-      # 5. Upload APK
+      # 6. Upload APK
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
