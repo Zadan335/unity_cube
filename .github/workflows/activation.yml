@@ -24,8 +24,13 @@ jobs:
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         with:
           targetPlatform: Android
-          unityVersion: 2022.3.62f1
-          androidSdkManagerParameters: "platforms;android-33"
+          unityVersion: 2022.3.62f3
+          projectPath: .
+          buildMethod: AndroidBuild.PerformAndroidBuild
+          buildName: Cube
+          buildsPath: build/Android
+          androidExportType: androidPackage
+          androidTargetSdkVersion: 33
 
       - name: Upload Build
         uses: actions/upload-artifact@v4
