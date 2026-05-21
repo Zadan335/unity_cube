@@ -1,4 +1,4 @@
-name: Unity License Activation Test
+name: Unity Legacy Activation Test
 
 on:
   workflow_dispatch:
@@ -11,26 +11,25 @@ jobs:
       image: unityci/editor:ubuntu-2022.3.59f1-android-3.1.0
 
     env:
-      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
 
     steps:
-      - name: Verify Unity Exists
+      - uses: actions/checkout@v4
+
+      - name: Verify Unity
         run: |
           which unity-editor
           unity-editor -version
 
       - name: Activate Unity License
         run: |
-          echo "$UNITY_LICENSE" > Unity_lic.ulf
+          unity-editor -batchmode -nographics -quit \
+            -username "$UNITY_EMAIL" \
+            -password "$UNITY_PASSWORD" \
+            -serial "$UNITY_SERIAL" \
+            -logFile unity-license.log
 
-          mkdir -p /root/.local/share/unity3d/Unity
-          mv Unity_lic.ulf /root/.local/share/unity3d/Unity/Unity_lic.ulf
-
-          unity-editor \
-            -batchmode \
-            -nographics \
-            -manualLicenseFile /root/.local/share/unity3d/Unity/Unity_lic.ulf \
-            -quit
-
-      - name: Activation Success
-        run: echo "Unity activated successfully"
+      - name: Show Log
+        run: cat unity-license.log
