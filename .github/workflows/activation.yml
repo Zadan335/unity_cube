@@ -3,37 +3,58 @@ name: Unity Android CI
 on:
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      build_type:
+        description: 'Build type'
+        required: false
+        default: 'Release'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    container:
+      image: unityci/editor:ubuntu-2022.3.59f1-android-3.1.0
+
+    env:
+      UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+      UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+      UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
+      UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+      ANDROID_KEYSTORE_PASS: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_ALIAS_PASS: ${{ secrets.ANDROID_KEY_ALIAS_PASS }}
+      BUILD_TYPE: ${{ github.event.inputs.build_type }}
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Cache Library
-        uses: actions/cache@v4
-        with:
-          path: Library
-          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+      - name: Check required secrets
+        run: |
+          if [ -z "$UNITY_EMAIL" ] || [ -z "$UNITY_PASSWORD" ] || [ -z "$UNITY_SERIAL" ]; then
+            echo "Missing Unity credentials"
+            exit 1
+          fi
+
+      - name: Activate Unity personal license
+        run: |
+          if [ -z "$UNITY_LICENSE" ]; then
+            echo "UNITY_LICENSE secret is missing"
+            exit 1
+          fi
+          echo "$UNITY_LICENSE" > /tmp/Unity_lic.ulf
+          mkdir -p /root/.local/share/unity3d/Unity
+          mv /tmp/Unity_lic.ulf /root/.local/share/unity3d/Unity/Unity_lic.ulf
+          /opt/Unity/Editor/Unity -batchmode -nographics -manualLicenseFile /root/.local/share/unity3d/Unity/Unity_lic.ulf -quit
 
       - name: Build Unity Project
-        uses: game-ci/unity-builder@v4
-        env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
-          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
-          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          targetPlatform: Android
-          unityVersion: 2022.3.62f3
-          projectPath: .
-          buildMethod: AndroidBuild.PerformAndroidBuild
-          buildName: Cube
-          buildsPath: build/Android
-          androidExportType: androidPackage
-          androidTargetSdkVersion: 33
+        run: |
+          /opt/Unity/Editor/Unity -batchmode -nographics -projectPath . -executeMethod AndroidBuild.PerformAndroidBuild -quit
 
       - name: Upload Build
         uses: actions/upload-artifact@v4
         with:
           name: android-build
-          path: build/Android/
+          path: Builds/Android/*.apk
