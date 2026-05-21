@@ -3,9 +3,9 @@ using System.Linq;
 using UnityEditor;
 using UnityEditor.Build.Reporting;
 
-public static class AndroidBuild
+public static class BuildScript
 {
-    public static void PerformAndroidBuild()
+    public static void BuildAndroid()
     {
         var scenes = EditorBuildSettings.scenes
             .Where(s => s.enabled)
@@ -14,16 +14,18 @@ public static class AndroidBuild
 
         if (scenes.Length == 0)
         {
-            throw new System.Exception("No enabled scenes found in Build Settings. Add at least one scene before building.");
+            throw new System.Exception("No enabled scenes found in Build Settings.");
         }
 
-        var outputDirectory = "Builds/Android";
-        if (!Directory.Exists(outputDirectory))
+        var outputDir = Path.Combine(Directory.GetCurrentDirectory(), "Builds/Android");
+
+        if (!Directory.Exists(outputDir))
         {
-            Directory.CreateDirectory(outputDirectory);
+            Directory.CreateDirectory(outputDir);
         }
 
-        var buildPath = Path.Combine(outputDirectory, "Cube.apk");
+        var buildPath = Path.Combine(outputDir, "Cube.apk");
+
         var buildOptions = new BuildPlayerOptions
         {
             scenes = scenes,
@@ -32,10 +34,17 @@ public static class AndroidBuild
             options = BuildOptions.None
         };
 
-        var report = BuildPipeline.BuildPlayer(buildOptions);
+        UnityEngine.Debug.Log("Starting Android Build at: " + buildPath);
+
+        BuildReport report = BuildPipeline.BuildPlayer(buildOptions);
+
         if (report.summary.result != BuildResult.Succeeded)
         {
-            throw new System.Exception($"Android build failed with result: {report.summary.result}");
+            throw new System.Exception(
+                "Android build failed: " + report.summary.result
+            );
         }
+
+        UnityEngine.Debug.Log("Android build completed successfully!");
     }
 }
