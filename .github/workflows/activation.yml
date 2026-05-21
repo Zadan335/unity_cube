@@ -1,4 +1,4 @@
-name: Unity Android Build (2022.3 LTS ARM)
+name: Unity Android Build (GameCI - 2022.3 LTS)
 
 on:
   push:
@@ -10,97 +10,86 @@ jobs:
     runs-on: [self-hosted, macOS]
 
     env:
-      UNITY_PATH: /Applications/Unity/Hub/Editor/2022.3.62f3/Unity.app/Contents/MacOS/Unity
-      PROJECT_PATH: ${{ github.workspace }}
+      UNITY_VERSION: 2022.3.62f3
 
     steps:
-      # -------------------------
+      # -----------------------------
       # 1. Checkout
-      # -------------------------
+      # -----------------------------
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # -------------------------
-      # 2. Debug
-      # -------------------------
-      - name: Debug Workspace
-        run: |
-          pwd
-          ls -la
-          file "$UNITY_PATH"
+      # -----------------------------
+      # 2. Cache (IMPORTANT for speed + stability)
+      # -----------------------------
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: |
+            Library
+            Library/Bee
+            Library/ArtifactDB
+          key: Library-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
 
-      # -------------------------
-      # 3. Fix permissions
-      # -------------------------
-      - name: Fix Permissions
-        run: |
-          sudo chown -R $(whoami) .
-          chmod -R u+rw .
-
-      # -------------------------
-      # 4. Clean SAFE Unity cache only
-      # -------------------------
-      - name: Clean Unity Cache (Safe)
-        run: |
-          rm -rf Library/ArtifactDB
-          rm -rf Library/Bee
-          rm -rf Temp
-          rm -rf Obj
-
-      # -------------------------
-      # 5. TMPDIR fix (IMPORTANT for Burst/IL2CPP)
-      # -------------------------
-      - name: Setup TMPDIR
-        run: |
-          mkdir -p /tmp/unity
-          echo "TMPDIR=/tmp/unity" >> $GITHUB_ENV
-
-      # -------------------------
-      # 6. Free memory (prevents SIGKILL 137)
-      # -------------------------
-      - name: Memory Cleanup
+      # -----------------------------
+      # 3. Free memory (helps SIGKILL 137)
+      # -----------------------------
+      - name: System Cleanup
         run: |
           sudo purge || true
 
-      # -------------------------
-      # 7. Build Android
-      # -------------------------
-      - name: Build Android APK
-        run: |
-          "$UNITY_PATH" \
-            -batchmode \
-            -nographics \
-            -projectPath "$PROJECT_PATH" \
-            -executeMethod BuildScript.BuildAndroid \
-            -logFile unity_build.log \
-            -quit \
-            -stackTraceLogType Full \
-            -silent-crashes \
-            -disable-assembly-updater
+      # -----------------------------
+      # 4. Build with GameCI
+      # -----------------------------
+      - name: Build Android (GameCI)
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
 
-      # -------------------------
-      # 8. Upload logs
-      # -------------------------
+        with:
+          projectPath: .
+          unityVersion: 2022.3.62f3
+          targetPlatform: Android
+
+          buildMethod: BuildScript.BuildAndroid
+          allowDirtyBuild: true
+
+          # =========================
+          # OUTPUT TYPE (choose ONE)
+          # =========================
+
+          androidAppBundle: false   # APK (testing)
+          # androidAppBundle: true  # AAB (Play Store)
+
+          # -------------------------
+          # KEYS STORE CONFIG
+          # -------------------------
+          androidKeystoreName: user.keystore
+          androidKeystoreBase64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          androidKeystorePass: ${{ secrets.ANDROID_KEYSTORE_PASS }}
+          androidKeyaliasName: ${{ secrets.ANDROID_KEYALIAS_NAME }}
+          androidKeyaliasPass: ${{ secrets.ANDROID_KEYALIAS_PASS }}
+
+      # -----------------------------
+      # 5. Upload logs (critical debugging)
+      # -----------------------------
       - name: Upload Unity Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: unity-logs
-          path: unity_build.log
+          path: |
+            **/*.log
 
-      # -------------------------
-      # 9. Find APK safely
-      # -------------------------
-      - name: Find APK
-        run: |
-          find . -name "*.apk"
-
-      # -------------------------
-      # 10. Upload APK
-      # -------------------------
-      - name: Upload APK
+      # -----------------------------
+      # 6. Upload APK / AAB
+      # -----------------------------
+      - name: Upload Build
         uses: actions/upload-artifact@v4
         with:
           name: android-build
           path: |
             **/*.apk
+            **/*.aab
