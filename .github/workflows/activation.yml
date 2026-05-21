@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      # 2. DEBUG STEP (VERY IMPORTANT)
+      # 2. Debug Workspace
       - name: Debug Workspace
         run: |
           echo "WORKDIR:"
@@ -26,7 +26,7 @@ jobs:
           echo "UNITY PROJECT CHECK:"
           ls Assets Packages ProjectSettings || echo "❌ NOT UNITY ROOT"
 
-      # 3. Cache Unity Library (BIG SPEED BOOST)
+      # 3. Cache Unity Library
       - name: Cache Library
         uses: actions/cache@v4
         with:
@@ -36,16 +36,19 @@ jobs:
             Library-${{ runner.os }}-
 
       # 4. Build Android (Unity Builder)
-      - name: Build Android APK
+      - name: Build Android
         uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_SERIAL: ${{ secrets.UNITY_SERIAL }}
         with:
           projectPath: ${{ github.workspace }}
           unityVersion: 2022.3.62f1
           targetPlatform: Android
           buildMethod: BuildScript.BuildAndroid
-          androidExportType: androidPackage
 
-      # 5. Upload logs (always helpful)
+      # 5. Upload Unity Logs
       - name: Upload Unity Logs
         if: always()
         uses: actions/upload-artifact@v4
