@@ -10,42 +10,48 @@ jobs:
     runs-on: [self-hosted, macOS]
 
     env:
-      UNITY_PATH: /Applications/Unity/Hub/Editor/6000.3.15f1/Unity.app/Contents/MacOS/Unity
+      UNITY_PATH: /Applications/Unity/Hub/Editor/6000.3.15f1f1/Unity.app/Contents/MacOS/Unity
       PROJECT_PATH: ${{ github.workspace }}
       TMPDIR: /tmp/unity
 
     steps:
-      # 1. Checkout project
+      # 1. Checkout
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. Debug workspace (optional but useful)
+      # 2. Debug
       - name: Debug Workspace
         run: |
           pwd
           ls -la
           echo "Unity Path: $UNITY_PATH"
+          file "$UNITY_PATH"
 
-      # 3. Fix permissions (important for cloned projects)
+      # 3. Fix permissions (important for self-hosted runners)
       - name: Fix Permissions
         run: |
           sudo chown -R $(whoami) .
           chmod -R u+rw .
 
-      # 4. Clean Unity generated folders (prevents Burst/Library corruption)
+      # 4. Clean ONLY unsafe Unity cache (DON'T overdelete in CI)
       - name: Clean Unity Cache
         run: |
-          rm -rf Library
-          rm -rf Temp
-          rm -rf Obj
+          rm -rf Library/ArtifactDB
+          rm -rf Temp/
+          rm -rf Obj/
 
-      # 5. Ensure safe temp directory (fixes Burst permission issues)
+      # 5. Setup safe temp dir (IMPORTANT for Burst + IL2CPP)
       - name: Setup TMPDIR
         run: |
           mkdir -p /tmp/unity
-          export TMPDIR=/tmp/unity
+          echo "TMPDIR=/tmp/unity" >> $GITHUB_ENV
 
-      # 6. Run Unity Build (NO arch -x86_64)
+      # 6. Free memory before Unity starts (prevents SIGKILL 9)
+      - name: Memory Cleanup
+        run: |
+          sudo purge || true
+
+      # 7. Build Android
       - name: Build Android APK
         run: |
           "$UNITY_PATH" \
@@ -53,10 +59,13 @@ jobs:
             -nographics \
             -projectPath "$PROJECT_PATH" \
             -executeMethod BuildScript.BuildAndroid \
+            -logFile unity_build.log \
             -quit \
-            -logFile unity_build.log
+            -stackTraceLogType Full \
+            -silent-crashes \
+            -disable-assembly-updater
 
-      # 7. Upload logs (very important for debugging)
+      # 8. Upload logs always
       - name: Upload Unity Logs
         if: always()
         uses: actions/upload-artifact@v4
@@ -64,9 +73,16 @@ jobs:
           name: unity-logs
           path: unity_build.log
 
-      # 8. Upload APK (adjust path if needed)
+      # 9. Find APK safely (DON'T assume path)
+      - name: Find APK
+        run: |
+          find . -name "*.apk" > apk_list.txt
+          cat apk_list.txt
+
+      # 10. Upload APK (robust)
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: android-build
-          path: Builds/*.apk
+          path: |
+            **/*.apk
